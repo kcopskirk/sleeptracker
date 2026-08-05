@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="zh-Hans">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="theme-color" content="#12151c" />
+  <meta name="description" content="睡眠状态追踪" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="apple-touch-icon" href="icon-180.png" />
+  <link rel="icon" type="image/png" href="icon-180.png" />
+  <title>睡眠追踪</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,500;8..60,600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div id="app">
+    <header class="topbar">
+      <div class="brand">
+        <p class="brand-name">睡眠追踪</p>
+        <p id="context-line" class="context-line"></p>
+      </div>
+      <nav class="tabs" role="tablist">
+        <button type="button" class="tab is-active" data-view="log" id="tab-log">记录</button>
+        <button type="button" class="tab" data-view="report" id="tab-report">周报</button>
+      </nav>
+    </header>
+
+    <main>
+      <section id="view-log" class="view is-active" aria-labelledby="tab-log"></section>
+      <section id="view-report" class="view" aria-labelledby="tab-report" hidden></section>
+    </main>
+  </div>
+
+  <div id="toast" class="toast" hidden></div>
+  <script src="app.js"></script>
+</body>
+</html>
