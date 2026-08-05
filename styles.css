@@ -100,6 +100,62 @@ body[data-theme="day"] {
   flex-direction: column;
   gap: 14px;
   margin-bottom: 18px;
+  position: relative;
+}
+
+.btn-user-switch {
+  position: absolute;
+  top: 0;
+  right: 0;
+  appearance: none;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.78rem;
+  padding: 4px 0;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.login-gate {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px;
+  background:
+    radial-gradient(1100px 520px at 50% -8%, var(--glow-1) 0%, transparent 58%),
+    var(--bg);
+}
+
+.login-gate[hidden] {
+  display: none !important;
+}
+
+.login-card {
+  width: 100%;
+  max-width: 400px;
+}
+
+.login-error {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--danger-bg);
+  color: var(--danger-text);
+  font-size: 0.85rem;
+}
+
+.login-error[hidden] {
+  display: none !important;
+}
+
+#app[hidden] {
+  display: none !important;
 }
 
 .brand-name {

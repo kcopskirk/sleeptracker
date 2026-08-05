@@ -17,12 +17,24 @@
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
+  <div id="login-gate" class="login-gate" hidden>
+    <div class="login-card panel">
+      <h1 class="panel-title">欢迎使用睡眠追踪</h1>
+      <p class="panel-sub">输入你的名字，记录会保存在本机</p>
+      <label class="label" for="login-username">用户名</label>
+      <input id="login-username" type="text" maxlength="16" autocomplete="nickname" placeholder="例如：小明" />
+      <p id="login-error" class="login-error" hidden></p>
+      <button type="button" class="btn btn-primary" id="btn-login">进入</button>
+    </div>
+  </div>
+
   <div id="app">
     <header class="topbar">
       <div class="brand">
-        <p class="brand-name">睡眠追踪</p>
+        <p class="brand-name" id="brand-name">睡眠追踪</p>
         <p id="context-line" class="context-line"></p>
       </div>
+      <button type="button" class="btn-user-switch" id="btn-switch-user">切换用户</button>
       <nav class="tabs" role="tablist">
         <button type="button" class="tab is-active" data-view="log" id="tab-log">记录</button>
         <button type="button" class="tab" data-view="report" id="tab-report">周报</button>

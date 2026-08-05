@@ -1,7 +1,8 @@
 (() => {
   "use strict";
 
-  const STORAGE_KEY = "sleepmonitor_v1";
+  const USER_SESSION_KEY = "sleepmonitor_current_user";
+  const LEGACY_STORAGE_KEY = "sleepmonitor_v1";
   const PRE_START_MIN = 21 * 60 + 30;
   const MORNING_START_MIN = 3 * 60;
   const WAKE_REASONS = [
@@ -15,7 +16,7 @@
   ];
 
   /** @type {{ nights: Record<string, any>, reports: Record<string, any> }} */
-  let db = loadDb();
+  let db = { nights: {}, reports: {} };
 
   /** @type {'log' | 'report'} */
   let currentView = "log";
@@ -35,6 +36,14 @@
     urlParams.has("debug") || sessionStorage.getItem(DEBUG_KEY) === "1";
   if (urlParams.has("debug")) sessionStorage.setItem(DEBUG_KEY, "1");
 
+  /** @type {string | null} */
+  let currentUser = null;
+
+  const elApp = document.getElementById("app");
+  const elLoginGate = document.getElementById("login-gate");
+  const elBrand = document.getElementById("brand-name");
+  const elLoginUser = document.getElementById("login-username");
+  const elLoginError = document.getElementById("login-error");
   const elLog = document.getElementById("view-log");
   const elReport = document.getElementById("view-report");
   const elContext = document.getElementById("context-line");
@@ -329,11 +338,80 @@
     return `${hr} 小时 ${min} 分`;
   }
 
+  // ---------- user / auth ----------
+
+  function storageKeyForUser(username) {
+    return `sleepmonitor_v1_${username}`;
+  }
+
+  function normalizeUsername(raw) {
+    const name = raw.trim().replace(/\s+/g, "");
+    if (!name) return null;
+    if (name.length > 16) return null;
+    if (!/^[\p{L}\p{N}_·]+$/u.test(name)) return null;
+    return name;
+  }
+
+  function getStoredUsername() {
+    const u = localStorage.getItem(USER_SESSION_KEY);
+    return u && normalizeUsername(u) ? u : null;
+  }
+
+  function migrateLegacyDb(username) {
+    const key = storageKeyForUser(username);
+    if (localStorage.getItem(key)) return;
+    const legacy = localStorage.getItem(LEGACY_STORAGE_KEY);
+    if (legacy) localStorage.setItem(key, legacy);
+  }
+
+  function updateBrandUi() {
+    if (!currentUser || !elBrand) return;
+    const title = `${currentUser}的睡眠追踪`;
+    elBrand.textContent = title;
+    document.title = title;
+  }
+
+  function showLoginGate() {
+    currentUser = null;
+    db = { nights: {}, reports: {} };
+    elApp.hidden = true;
+    elLoginGate.hidden = false;
+    if (elLoginUser) {
+      elLoginUser.value = "";
+      elLoginUser.focus();
+    }
+    if (elLoginError) elLoginError.hidden = true;
+  }
+
+  function loginAs(username) {
+    const name = normalizeUsername(username);
+    if (!name) return false;
+    migrateLegacyDb(name);
+    currentUser = name;
+    localStorage.setItem(USER_SESSION_KEY, name);
+    db = loadDb();
+    elLoginGate.hidden = true;
+    elApp.hidden = false;
+    updateBrandUi();
+    ensureLockedSnapshots(now());
+    const d = resolveDefaultForm(now());
+    formMode = d.mode;
+    formNightId = d.nightKey;
+    render();
+    return true;
+  }
+
+  function logoutUser() {
+    localStorage.removeItem(USER_SESSION_KEY);
+    showLoginGate();
+  }
+
   // ---------- storage ----------
 
   function loadDb() {
+    if (!currentUser) return { nights: {}, reports: {} };
     try {
-      const raw = localStorage.getItem(STORAGE_KEY);
+      const raw = localStorage.getItem(storageKeyForUser(currentUser));
       if (!raw) return { nights: {}, reports: {} };
       const parsed = JSON.parse(raw);
       return {
@@ -346,7 +424,8 @@
   }
 
   function saveDb() {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
+    if (!currentUser) return;
+    localStorage.setItem(storageKeyForUser(currentUser), JSON.stringify(db));
   }
 
   function getNight(nightKey) {
@@ -619,6 +698,7 @@
   }
 
   function render() {
+    if (!currentUser) return;
     const t = now();
     ensureLockedSnapshots(t);
     applyTheme();
@@ -649,7 +729,9 @@
       nightKey !== defaultTarget.nightKey || mode !== defaultTarget.mode;
 
     let html = `<div class="panel">`;
-    html += `<h2 class="panel-title">${mode === "aset" ? "睡前记录" : "起床后记录"}</h2>`;
+    html += `<h2 class="panel-title">${
+      mode === "aset" ? `${currentUser}，晚安啦` : `${currentUser}，早上好`
+    }</h2>`;
     html += `<p class="panel-sub">${formatNightLabel(nightKey)}</p>`;
 
     if (showBackToDefault) {
@@ -1285,6 +1367,22 @@
 
   // ---------- init ----------
 
+  document.getElementById("btn-login")?.addEventListener("click", () => {
+    const ok = loginAs(elLoginUser?.value || "");
+    if (!ok && elLoginError) {
+      elLoginError.hidden = false;
+      elLoginError.textContent = "请输入 1–16 个字符（中文、字母、数字均可）";
+    }
+  });
+
+  elLoginUser?.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") document.getElementById("btn-login")?.click();
+  });
+
+  document.getElementById("btn-switch-user")?.addEventListener("click", () => {
+    if (confirm("切换用户？当前页面会回到登录，各用户记录分开保存。")) logoutUser();
+  });
+
   document.querySelectorAll(".tab").forEach((btn) => {
     btn.addEventListener("click", () => setView(btn.dataset.view));
   });
@@ -1296,13 +1394,14 @@
     formNightId = d.nightKey;
   });
 
-  ensureLockedSnapshots(now());
-  const initial = resolveDefaultForm(now());
-  formMode = initial.mode;
-  formNightId = initial.nightKey;
-  render();
+  const savedUser = getStoredUsername();
+  if (savedUser) {
+    loginAs(savedUser);
+  } else {
+    showLoginGate();
+  }
 
   setInterval(() => {
-    updateContext(now());
+    if (currentUser) updateContext(now());
   }, 60_000);
 })();
