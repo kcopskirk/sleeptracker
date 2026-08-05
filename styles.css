@@ -716,3 +716,84 @@ body:has(.debug-panel) #app {
   padding-bottom: calc(46vh + var(--safe-bottom));
 }
 
+.complete-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  background-color: #0b1220;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+.complete-screen[hidden] {
+  display: none !important;
+}
+
+.complete-screen.is-night {
+  background-image: url("complete-night.jpg");
+  background-color: #0b1220;
+}
+
+.complete-screen.is-day {
+  background-image: url("complete-day.jpg");
+  background-color: #fff3d1;
+}
+
+.complete-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  padding: 20px 20px calc(28px + var(--safe-bottom));
+  background: linear-gradient(180deg, transparent 0%, rgba(0, 0, 0, 0.35) 40%, rgba(0, 0, 0, 0.55) 100%);
+}
+
+.complete-screen.is-day .complete-actions {
+  background: linear-gradient(180deg, transparent 0%, rgba(255, 248, 230, 0.55) 35%, rgba(255, 243, 209, 0.92) 100%);
+}
+
+.complete-btn {
+  margin: 0;
+  min-height: 52px;
+  border-radius: 16px;
+  font-weight: 600;
+  font-size: 1rem;
+}
+
+.complete-btn-edit {
+  background: rgba(255, 255, 255, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  color: #f5f7fb;
+  backdrop-filter: blur(8px);
+}
+
+.complete-screen.is-day .complete-btn-edit {
+  background: #fffaf0;
+  border: 1px solid rgba(140, 100, 40, 0.22);
+  color: #3d2e14;
+}
+
+.complete-btn-bye {
+  background: var(--accent);
+  border-color: transparent;
+  color: var(--accent-ink);
+}
+
+.complete-screen.is-night .complete-btn-bye {
+  background: #6eb8a8;
+  color: #0f1715;
+}
+
+.complete-screen.is-day .complete-btn-bye {
+  background: #ffc933;
+  color: #3d2e14;
+}
+
+body.complete-open .debug-panel {
+  display: none !important;
+}
+
+

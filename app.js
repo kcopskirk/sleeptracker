@@ -44,6 +44,7 @@
   const elBrand = document.getElementById("brand-name");
   const elLoginUser = document.getElementById("login-username");
   const elLoginError = document.getElementById("login-error");
+  const elComplete = document.getElementById("complete-screen");
   const elLog = document.getElementById("view-log");
   const elReport = document.getElementById("view-report");
   const elContext = document.getElementById("context-line");
@@ -374,6 +375,7 @@
   function showLoginGate() {
     currentUser = null;
     db = { nights: {}, reports: {} };
+    hideComplete();
     elApp.hidden = true;
     elLoginGate.hidden = false;
     if (elLoginUser) {
@@ -662,6 +664,7 @@
   // ---------- views ----------
 
   function setView(name) {
+    hideComplete();
     currentView = name;
     document.querySelectorAll(".tab").forEach((btn) => {
       btn.classList.toggle("is-active", btn.dataset.view === name);
@@ -690,11 +693,45 @@
   }
 
   function applyTheme() {
+    if (elComplete && !elComplete.hidden) {
+      const isDay = elComplete.classList.contains("is-day");
+      document.body.dataset.theme = isDay ? "day" : "night";
+      const meta = document.querySelector('meta[name="theme-color"]');
+      if (meta) meta.setAttribute("content", isDay ? "#fff3d1" : "#0b1220");
+      return;
+    }
     const theme =
       currentView === "log" && formMode === "bset" ? "day" : "night";
     document.body.dataset.theme = theme;
     const meta = document.querySelector('meta[name="theme-color"]');
     if (meta) meta.setAttribute("content", theme === "day" ? "#fff3d1" : "#12151c");
+  }
+
+  function showComplete(kind) {
+    if (!elComplete) return;
+    elComplete.hidden = false;
+    elComplete.classList.toggle("is-night", kind === "aset");
+    elComplete.classList.toggle("is-day", kind === "bset");
+    document.body.classList.add("complete-open");
+    applyTheme();
+  }
+
+  function hideComplete() {
+    if (!elComplete) return;
+    elComplete.hidden = true;
+    elComplete.classList.remove("is-night", "is-day");
+    document.body.classList.remove("complete-open");
+    applyTheme();
+  }
+
+  function tryCloseApp() {
+    // Home-screen / standalone often ignores window.close()
+    window.close();
+    setTimeout(() => {
+      if (!document.hidden) {
+        toast("可以上滑或切回主屏幕离开啦");
+      }
+    }, 280);
   }
 
   function render() {
@@ -1082,10 +1119,8 @@
 
       const night = ensureNight(formNightId);
       night.aset = payload;
-      // invalidate unlocked report cache conceptually by not writing snapshot
       saveDb();
-      toast(`已保存 ${formatNightLabel(formNightId)} 睡前记录`);
-      renderLog(now());
+      showComplete("aset");
     });
   }
 
@@ -1211,8 +1246,7 @@
         const night = ensureNight(formNightId);
         night.bset = payload;
         saveDb();
-        toast(`已保存 ${formatNightLabel(formNightId)} 起床记录`);
-        renderLog(now());
+        showComplete("bset");
       }
     });
   }
@@ -1381,6 +1415,21 @@
 
   document.getElementById("btn-switch-user")?.addEventListener("click", () => {
     if (confirm("切换用户？当前页面会回到登录，各用户记录分开保存。")) logoutUser();
+  });
+
+  document.getElementById("btn-complete-edit")?.addEventListener("click", () => {
+    hideComplete();
+    currentView = "log";
+    document.querySelectorAll(".tab").forEach((btn) => {
+      btn.classList.toggle("is-active", btn.dataset.view === "log");
+    });
+    elLog.hidden = false;
+    elReport.hidden = true;
+    renderLog(now());
+  });
+
+  document.getElementById("btn-complete-bye")?.addEventListener("click", () => {
+    tryCloseApp();
   });
 
   document.querySelectorAll(".tab").forEach((btn) => {
