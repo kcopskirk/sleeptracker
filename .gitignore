@@ -1,2 +1,6 @@
 .DS_Store
 icon-source.png
+.venv/
+preview-*.png
+icon-flamingo-pink-flush-fixed.png
+icon-flamingo-pink-shifted.png
