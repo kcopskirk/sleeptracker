@@ -28,8 +28,11 @@
   let reportWeekKey = null;
   /** After「我要修改」, stay on form until next save or time-window change */
   let editingAfterComplete = false;
+  /** 补填等「非当前窗」编辑：保存后强制回默认问卷，不进完成页 */
+  let returnToDefaultAfterSave = false;
   /** @type {string | null} */
   let lastWindowKey = null;
+  const SKIP_COMPLETE_KEY = "sleepmonitor_skip_complete";
 
   const CLOCK_KEY = "sleepmonitor_clock";
   const DEBUG_KEY = "sleepmonitor_debug";
@@ -533,7 +536,7 @@
     };
     saveDb();
     // Import is restore, not "just submitted" — land on main form
-    editingAfterComplete = true;
+    markSkipAutoComplete();
     reportWeekKey = null;
     hideComplete();
     elLoginGate.hidden = true;
@@ -587,7 +590,7 @@
       } else {
         db = imported.data;
         saveDb();
-        editingAfterComplete = true;
+        markSkipAutoComplete();
         reportWeekKey = null;
         hideComplete();
         const target = resolveDefaultForm(now());
@@ -902,6 +905,28 @@
     applyTheme();
   }
 
+  function markSkipAutoComplete() {
+    editingAfterComplete = true;
+    try {
+      sessionStorage.setItem(SKIP_COMPLETE_KEY, "1");
+    } catch {
+      /* ignore */
+    }
+  }
+
+  function consumeSkipAutoComplete() {
+    let skip = editingAfterComplete;
+    try {
+      if (sessionStorage.getItem(SKIP_COMPLETE_KEY) === "1") {
+        skip = true;
+        sessionStorage.removeItem(SKIP_COMPLETE_KEY);
+      }
+    } catch {
+      /* ignore */
+    }
+    return skip;
+  }
+
   /**
    * After saving one side: only open that side's complete page when it is
    * the current time-window default. Otherwise return to the default form
@@ -911,7 +936,11 @@
     const t = now();
     const target = resolveDefaultForm(t);
     const isCurrentWindowDefault =
-      savedMode === target.mode && formNightId === target.nightKey;
+      !returnToDefaultAfterSave &&
+      savedMode === target.mode &&
+      formNightId === target.nightKey;
+
+    returnToDefaultAfterSave = false;
 
     if (isCurrentWindowDefault) {
       showComplete(savedMode);
@@ -921,15 +950,18 @@
     hideComplete();
     formMode = target.mode;
     formNightId = target.nightKey;
-    // Stay on the form so user can continue (don't auto-jump to complete)
-    editingAfterComplete = true;
+    markSkipAutoComplete();
     currentView = "log";
     document.querySelectorAll(".tab").forEach((btn) => {
       btn.classList.toggle("is-active", btn.dataset.view === "log");
     });
     elLog.hidden = false;
     elReport.hidden = true;
-    toast(savedMode === "aset" ? "睡前已补填，可继续填写起床记录" : "起床记录已保存");
+    toast(
+      savedMode === "aset"
+        ? "睡前已补填，可继续填写起床记录"
+        : "记录已保存，已回到当前时段"
+    );
     renderLog(t);
   }
 
@@ -950,6 +982,10 @@
   function maybeAutoShowComplete(t = now()) {
     if (!currentUser || currentView !== "log") return false;
     syncWindowEditFlag(t);
+    if (consumeSkipAutoComplete()) {
+      editingAfterComplete = true;
+      return false;
+    }
     if (editingAfterComplete) return false;
 
     const d = resolveDefaultForm(t);
@@ -1264,6 +1300,7 @@
     });
     document.getElementById("btn-fill-aset")?.addEventListener("click", () => {
       formMode = "aset";
+      returnToDefaultAfterSave = true;
       renderLog(now());
     });
   }
@@ -1679,7 +1716,7 @@
   });
 
   document.getElementById("btn-complete-edit")?.addEventListener("click", () => {
-    editingAfterComplete = true;
+    markSkipAutoComplete();
     hideComplete();
     currentView = "log";
     document.querySelectorAll(".tab").forEach((btn) => {
