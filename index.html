@@ -34,7 +34,12 @@
         <p class="brand-name" id="brand-name">睡眠追踪</p>
         <p id="context-line" class="context-line"></p>
       </div>
-      <button type="button" class="btn-user-switch" id="btn-switch-user">切换用户</button>
+      <div class="user-actions">
+        <button type="button" class="btn-user-action" id="btn-export-data">导出</button>
+        <button type="button" class="btn-user-action" id="btn-import-data">导入</button>
+        <button type="button" class="btn-user-action" id="btn-switch-user">切换用户</button>
+      </div>
+      <input id="import-file" type="file" accept="application/json,.json" hidden />
       <nav class="tabs" role="tablist">
         <button type="button" class="tab is-active" data-view="log" id="tab-log">记录</button>
         <button type="button" class="tab" data-view="report" id="tab-report">周报</button>

@@ -53,6 +53,7 @@
   const elReport = document.getElementById("view-report");
   const elContext = document.getElementById("context-line");
   const elToast = document.getElementById("toast");
+  const elImportFile = document.getElementById("import-file");
 
   // ---------- clock / debug ----------
 
@@ -432,6 +433,128 @@
   function saveDb() {
     if (!currentUser) return;
     localStorage.setItem(storageKeyForUser(currentUser), JSON.stringify(db));
+  }
+
+  function isPlainObject(value) {
+    return (
+      value !== null &&
+      typeof value === "object" &&
+      !Array.isArray(value)
+    );
+  }
+
+  function safeFilePart(value) {
+    return value.replace(/[^\p{L}\p{N}_-]+/gu, "_").slice(0, 30) || "user";
+  }
+
+  function buildExportFile() {
+    const payload = {
+      format: "sleepmonitor-backup",
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      user: currentUser,
+      data: {
+        nights: db.nights || {},
+        reports: db.reports || {},
+      },
+    };
+    const filename = `sleeptracker-${safeFilePart(currentUser)}-${dateKey(new Date())}.json`;
+    const json = JSON.stringify(payload, null, 2);
+    return {
+      filename,
+      file: new File([json], filename, { type: "application/json" }),
+    };
+  }
+
+  async function exportData() {
+    if (!currentUser) return;
+    const { filename, file } = buildExportFile();
+
+    try {
+      if (
+        navigator.share &&
+        navigator.canShare?.({ files: [file] })
+      ) {
+        await navigator.share({
+          title: `${currentUser}的睡眠记录备份`,
+          files: [file],
+        });
+        toast("备份已交给系统分享");
+        return;
+      }
+
+      const url = URL.createObjectURL(file);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      toast("备份文件已导出");
+    } catch (error) {
+      if (error?.name !== "AbortError") {
+        toast("导出失败，请再试一次");
+      }
+    }
+  }
+
+  function normalizeImportedBackup(parsed) {
+    const data =
+      parsed?.format === "sleepmonitor-backup" ? parsed.data : parsed;
+    if (
+      !isPlainObject(data) ||
+      !isPlainObject(data.nights) ||
+      (data.reports != null && !isPlainObject(data.reports))
+    ) {
+      throw new Error("备份格式不正确");
+    }
+    return {
+      sourceUser:
+        parsed?.format === "sleepmonitor-backup" && typeof parsed.user === "string"
+          ? parsed.user
+          : null,
+      data: {
+        nights: data.nights,
+        reports: data.reports || {},
+      },
+    };
+  }
+
+  async function importDataFile(file) {
+    if (!file || !currentUser) return;
+    if (file.size > 10 * 1024 * 1024) {
+      toast("备份文件过大，无法导入");
+      return;
+    }
+
+    try {
+      const parsed = JSON.parse(await file.text());
+      const imported = normalizeImportedBackup(parsed);
+      const nightCount = Object.keys(imported.data.nights).length;
+      const source = imported.sourceUser
+        ? `（来自 ${imported.sourceUser}）`
+        : "";
+      const ok = confirm(
+        `将导入 ${nightCount} 条睡眠夜记录${source}，并覆盖 ${currentUser} 当前的本机数据。继续吗？`
+      );
+      if (!ok) return;
+
+      db = imported.data;
+      saveDb();
+      editingAfterComplete = false;
+      reportWeekKey = null;
+      hideComplete();
+      const target = resolveDefaultForm(now());
+      formMode = target.mode;
+      formNightId = target.nightKey;
+      render();
+      toast(`已导入 ${nightCount} 条睡眠夜记录`);
+    } catch {
+      toast("导入失败：请选择睡眠追踪导出的 JSON 文件");
+    } finally {
+      elImportFile.value = "";
+    }
   }
 
   function getNight(nightKey) {
@@ -1456,6 +1579,18 @@
 
   document.getElementById("btn-switch-user")?.addEventListener("click", () => {
     if (confirm("切换用户？当前页面会回到登录，各用户记录分开保存。")) logoutUser();
+  });
+
+  document.getElementById("btn-export-data")?.addEventListener("click", () => {
+    exportData();
+  });
+
+  document.getElementById("btn-import-data")?.addEventListener("click", () => {
+    elImportFile?.click();
+  });
+
+  elImportFile?.addEventListener("change", () => {
+    importDataFile(elImportFile.files?.[0]);
   });
 
   document.getElementById("btn-complete-edit")?.addEventListener("click", () => {
