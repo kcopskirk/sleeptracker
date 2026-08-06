@@ -532,7 +532,8 @@
       reports: data.reports || {},
     };
     saveDb();
-    editingAfterComplete = false;
+    // Import is restore, not "just submitted" — land on main form
+    editingAfterComplete = true;
     reportWeekKey = null;
     hideComplete();
     elLoginGate.hidden = true;
@@ -586,7 +587,7 @@
       } else {
         db = imported.data;
         saveDb();
-        editingAfterComplete = false;
+        editingAfterComplete = true;
         reportWeekKey = null;
         hideComplete();
         const target = resolveDefaultForm(now());
@@ -899,6 +900,37 @@
     elComplete.classList.remove("is-night", "is-day");
     document.body.classList.remove("complete-open");
     applyTheme();
+  }
+
+  /**
+   * After saving one side: only open that side's complete page when it is
+   * the current time-window default. Otherwise return to the default form
+   * (e.g. daytime 补填睡前 → back to morning questionnaire).
+   */
+  function afterSaveSide(savedMode) {
+    const t = now();
+    const target = resolveDefaultForm(t);
+    const isCurrentWindowDefault =
+      savedMode === target.mode && formNightId === target.nightKey;
+
+    if (isCurrentWindowDefault) {
+      showComplete(savedMode);
+      return;
+    }
+
+    hideComplete();
+    formMode = target.mode;
+    formNightId = target.nightKey;
+    // Stay on the form so user can continue (don't auto-jump to complete)
+    editingAfterComplete = true;
+    currentView = "log";
+    document.querySelectorAll(".tab").forEach((btn) => {
+      btn.classList.toggle("is-active", btn.dataset.view === "log");
+    });
+    elLog.hidden = false;
+    elReport.hidden = true;
+    toast(savedMode === "aset" ? "睡前已补填，可继续填写起床记录" : "起床记录已保存");
+    renderLog(t);
   }
 
   function currentWindowKey(t = now()) {
@@ -1326,7 +1358,7 @@
       const night = ensureNight(formNightId);
       night.aset = payload;
       saveDb();
-      showComplete("aset");
+      afterSaveSide("aset");
     };
   }
 
@@ -1414,7 +1446,7 @@
       const night = ensureNight(formNightId);
       night.bset = payload;
       saveDb();
-      showComplete("bset");
+      afterSaveSide("bset");
     }
 
     root.querySelector("#btn-save-bset").onclick = () => {
