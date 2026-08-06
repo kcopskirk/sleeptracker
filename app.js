@@ -26,6 +26,10 @@
   let formNightId = null;
   /** @type {string | null} selected week monday key for report */
   let reportWeekKey = null;
+  /** After「我要修改」, stay on form until next save or time-window change */
+  let editingAfterComplete = false;
+  /** @type {string | null} */
+  let lastWindowKey = null;
 
   const CLOCK_KEY = "sleepmonitor_clock";
   const DEBUG_KEY = "sleepmonitor_debug";
@@ -664,6 +668,10 @@
   // ---------- views ----------
 
   function setView(name) {
+    if (name === "report") {
+      // Leaving 记录 cancels in-progress edit; coming back can auto-show complete
+      editingAfterComplete = false;
+    }
     hideComplete();
     currentView = name;
     document.querySelectorAll(".tab").forEach((btn) => {
@@ -709,10 +717,15 @@
 
   function showComplete(kind) {
     if (!elComplete) return;
+    elComplete.classList.remove("is-night", "is-day");
+    elComplete.classList.add(kind === "aset" ? "is-night" : "is-day");
+    const line2 = document.getElementById("complete-line2");
+    if (line2) {
+      line2.textContent = kind === "aset" ? "睡个好觉！" : "新的一天！";
+    }
     elComplete.hidden = false;
-    elComplete.classList.toggle("is-night", kind === "aset");
-    elComplete.classList.toggle("is-day", kind === "bset");
     document.body.classList.add("complete-open");
+    editingAfterComplete = false;
     applyTheme();
   }
 
@@ -724,14 +737,38 @@
     applyTheme();
   }
 
-  function tryCloseApp() {
-    // Home-screen / standalone often ignores window.close()
-    window.close();
-    setTimeout(() => {
-      if (!document.hidden) {
-        toast("可以上滑或切回主屏幕离开啦");
-      }
-    }, 280);
+  function currentWindowKey(t = now()) {
+    const d = resolveDefaultForm(t);
+    return `${d.mode}:${d.nightKey}`;
+  }
+
+  function syncWindowEditFlag(t = now()) {
+    const key = currentWindowKey(t);
+    if (lastWindowKey && lastWindowKey !== key) {
+      editingAfterComplete = false;
+    }
+    lastWindowKey = key;
+  }
+
+  /** If current time-window side already filled, open completion until next window */
+  function maybeAutoShowComplete(t = now()) {
+    if (!currentUser || currentView !== "log") return false;
+    syncWindowEditFlag(t);
+    if (editingAfterComplete) return false;
+
+    const d = resolveDefaultForm(t);
+    formMode = d.mode;
+    formNightId = d.nightKey;
+    const night = getNight(d.nightKey);
+    if (d.mode === "aset" && night?.aset) {
+      showComplete("aset");
+      return true;
+    }
+    if (d.mode === "bset" && night?.bset) {
+      showComplete("bset");
+      return true;
+    }
+    return false;
   }
 
   function render() {
@@ -741,8 +778,13 @@
     applyTheme();
     updateContext(t);
     mountDebugPanel();
-    if (currentView === "log") renderLog(t);
-    else renderReport(t);
+    if (currentView === "log") {
+      if (maybeAutoShowComplete(t)) return;
+      renderLog(t);
+    } else {
+      hideComplete();
+      renderReport(t);
+    }
   }
 
   function renderLog(now) {
@@ -1080,7 +1122,7 @@
     }
     syncConditional();
 
-    root.querySelector("#btn-save-aset").addEventListener("click", () => {
+    root.querySelector("#btn-save-aset").onclick = () => {
       const errors = [];
       if (exercised == null) errors.push("请选择白天是否运动");
       if (napped == null) errors.push("请选择白天是否睡觉");
@@ -1121,7 +1163,7 @@
       night.aset = payload;
       saveDb();
       showComplete("aset");
-    });
+    };
   }
 
   function bindBsetForm(existing) {
@@ -1190,7 +1232,28 @@
     }
     syncWaking();
 
-    root.querySelector("#btn-save-bset").addEventListener("click", () => {
+    function saveBset() {
+      const wakeTime = root.querySelector("#wakeTime").value;
+      const payload = {
+        wakeTime,
+        sleepEase: state.sleepEase,
+        nightWaking: state.nightWaking,
+        wakeReasons: state.nightWaking ? [...state.wakeReasons] : [],
+        otherReason:
+          state.nightWaking && state.wakeReasons.has("其他")
+            ? root.querySelector("#otherReason").value.trim()
+            : "",
+        reSleepEase: state.nightWaking ? state.reSleepEase : null,
+        sleepScore: state.sleepScore,
+        updatedAt: now().toISOString(),
+      };
+      const night = ensureNight(formNightId);
+      night.bset = payload;
+      saveDb();
+      showComplete("bset");
+    }
+
+    root.querySelector("#btn-save-bset").onclick = () => {
       const errors = [];
       const soft = [];
       const wakeTime = root.querySelector("#wakeTime").value;
@@ -1210,45 +1273,27 @@
         const pair = bedWakeDates(formNightId, aset.bedtime, wakeTime);
         if (pair) {
           const h = hoursBetween(pair.bed, pair.wake);
-          if (h < 3 || h > 14) soft.push(`在床约 ${formatHours(h)}，确认无误再保存？`);
+          if (h < 3 || h > 14) soft.push(`在床约 ${formatHours(h)}，已按你的填写保存`);
         }
       }
 
       const errBox = root.querySelector("#form-errors");
       errBox.innerHTML = errors.map((e) => `<div>${e}</div>`).join("");
       const softBox = root.querySelector("#soft-warn");
-      if (soft.length && !errors.length) {
-        softBox.hidden = false;
-        softBox.innerHTML =
-          soft.join("<br/>") +
-          `<div style="margin-top:8px"><button type="button" class="btn btn-primary" id="btn-force-save">仍要保存</button></div>`;
-        softBox.querySelector("#btn-force-save").onclick = () => saveBset(true);
+      if (errors.length) {
+        softBox.hidden = true;
         return;
       }
-      softBox.hidden = true;
-      if (errors.length) return;
-      saveBset(false);
-
-      function saveBset() {
-        const payload = {
-          wakeTime,
-          sleepEase: state.sleepEase,
-          nightWaking: state.nightWaking,
-          wakeReasons: state.nightWaking ? [...state.wakeReasons] : [],
-          otherReason:
-            state.nightWaking && state.wakeReasons.has("其他")
-              ? root.querySelector("#otherReason").value.trim()
-              : "",
-          reSleepEase: state.nightWaking ? state.reSleepEase : null,
-          sleepScore: state.sleepScore,
-          updatedAt: now().toISOString(),
-        };
-        const night = ensureNight(formNightId);
-        night.bset = payload;
-        saveDb();
-        showComplete("bset");
+      // Soft notes no longer block completion — always save then show complete
+      if (soft.length) {
+        softBox.hidden = false;
+        softBox.textContent = soft.join(" ");
+      } else {
+        softBox.hidden = true;
+        softBox.textContent = "";
       }
-    });
+      saveBset();
+    };
   }
 
   // ---------- report UI ----------
@@ -1418,6 +1463,7 @@
   });
 
   document.getElementById("btn-complete-edit")?.addEventListener("click", () => {
+    editingAfterComplete = true;
     hideComplete();
     currentView = "log";
     document.querySelectorAll(".tab").forEach((btn) => {
@@ -1425,11 +1471,13 @@
     });
     elLog.hidden = false;
     elReport.hidden = true;
+    const d = resolveDefaultForm(now());
+    // Keep editing the side that was just shown as complete if still in window
+    if (!formNightId || !formMode) {
+      formMode = d.mode;
+      formNightId = d.nightKey;
+    }
     renderLog(now());
-  });
-
-  document.getElementById("btn-complete-bye")?.addEventListener("click", () => {
-    tryCloseApp();
   });
 
   document.querySelectorAll(".tab").forEach((btn) => {
@@ -1441,6 +1489,8 @@
     const d = resolveDefaultForm(now());
     formMode = d.mode;
     formNightId = d.nightKey;
+    // Re-entering 记录 tab: if already filled, auto complete (unless editing)
+    // setView already called render via tab handler order — ensure auto complete
   });
 
   const savedUser = getStoredUsername();
@@ -1451,6 +1501,12 @@
   }
 
   setInterval(() => {
-    if (currentUser) updateContext(now());
+    if (!currentUser) return;
+    const t = now();
+    updateContext(t);
+    syncWindowEditFlag(t);
+    if (currentView === "log" && !editingAfterComplete) {
+      maybeAutoShowComplete(t);
+    }
   }, 60_000);
 })();

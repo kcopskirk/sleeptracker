@@ -722,7 +722,7 @@ body:has(.debug-panel) #app {
   z-index: 70;
   display: flex;
   flex-direction: column;
-  justify-content: flex-end;
+  justify-content: space-between;
   background-color: #0b1220;
   background-size: cover;
   background-position: center;
@@ -743,9 +743,42 @@ body:has(.debug-panel) #app {
   background-color: #fff3d1;
 }
 
+.complete-copy {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 0 28px;
+  text-align: center;
+  pointer-events: none;
+}
+
+.complete-line1,
+.complete-line2 {
+  margin: 0;
+  font-family: var(--serif);
+  font-weight: 600;
+  font-size: clamp(1.35rem, 5.2vw, 1.75rem);
+  line-height: 1.45;
+  letter-spacing: 0.02em;
+}
+
+.complete-screen.is-night .complete-line1,
+.complete-screen.is-night .complete-line2 {
+  color: #f4f1e8;
+  text-shadow: 0 1px 10px rgba(0, 0, 0, 0.35);
+}
+
+.complete-screen.is-day .complete-line1,
+.complete-screen.is-day .complete-line2 {
+  color: #3d2e14;
+  text-shadow: 0 1px 8px rgba(255, 248, 230, 0.65);
+}
+
 .complete-actions {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr;
   gap: 12px;
   padding: 20px 20px calc(28px + var(--safe-bottom));
   background: linear-gradient(180deg, transparent 0%, rgba(0, 0, 0, 0.35) 40%, rgba(0, 0, 0, 0.55) 100%);
@@ -773,22 +806,6 @@ body:has(.debug-panel) #app {
 .complete-screen.is-day .complete-btn-edit {
   background: #fffaf0;
   border: 1px solid rgba(140, 100, 40, 0.22);
-  color: #3d2e14;
-}
-
-.complete-btn-bye {
-  background: var(--accent);
-  border-color: transparent;
-  color: var(--accent-ink);
-}
-
-.complete-screen.is-night .complete-btn-bye {
-  background: #6eb8a8;
-  color: #0f1715;
-}
-
-.complete-screen.is-day .complete-btn-bye {
-  background: #ffc933;
   color: #3d2e14;
 }
 
