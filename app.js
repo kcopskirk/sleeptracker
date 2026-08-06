@@ -719,10 +719,6 @@
     if (!elComplete) return;
     elComplete.classList.remove("is-night", "is-day");
     elComplete.classList.add(kind === "aset" ? "is-night" : "is-day");
-    const line2 = document.getElementById("complete-line2");
-    if (line2) {
-      line2.textContent = kind === "aset" ? "睡个好觉！" : "新的一天！";
-    }
     elComplete.hidden = false;
     document.body.classList.add("complete-open");
     editingAfterComplete = false;
