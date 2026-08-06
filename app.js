@@ -447,18 +447,18 @@
     return value.replace(/[^\p{L}\p{N}_-]+/gu, "_").slice(0, 30) || "user";
   }
 
-  function buildExportFile() {
+  function buildExportFile(username = currentUser, data = db) {
     const payload = {
       format: "sleepmonitor-backup",
       version: 1,
       exportedAt: new Date().toISOString(),
-      user: currentUser,
+      user: username,
       data: {
-        nights: db.nights || {},
-        reports: db.reports || {},
+        nights: data.nights || {},
+        reports: data.reports || {},
       },
     };
-    const filename = `sleeptracker-${safeFilePart(currentUser)}-${dateKey(new Date())}.json`;
+    const filename = `sleeptracker-${safeFilePart(username)}-${dateKey(new Date())}.json`;
     const json = JSON.stringify(payload, null, 2);
     return {
       filename,
@@ -468,7 +468,7 @@
 
   async function exportData() {
     if (!currentUser) return;
-    const { filename, file } = buildExportFile();
+    const { filename, file } = buildExportFile(currentUser, db);
 
     try {
       if (
@@ -509,11 +509,12 @@
     ) {
       throw new Error("备份格式不正确");
     }
+    const sourceUserRaw =
+      parsed?.format === "sleepmonitor-backup" && typeof parsed.user === "string"
+        ? parsed.user
+        : null;
     return {
-      sourceUser:
-        parsed?.format === "sleepmonitor-backup" && typeof parsed.user === "string"
-          ? parsed.user
-          : null,
+      sourceUser: sourceUserRaw ? normalizeUsername(sourceUserRaw) : null,
       data: {
         nights: data.nights,
         reports: data.reports || {},
@@ -521,8 +522,32 @@
     };
   }
 
-  async function importDataFile(file) {
-    if (!file || !currentUser) return;
+  function applyImportedData(username, data) {
+    const name = normalizeUsername(username);
+    if (!name) throw new Error("备份缺少有效用户名");
+    currentUser = name;
+    localStorage.setItem(USER_SESSION_KEY, name);
+    db = {
+      nights: data.nights || {},
+      reports: data.reports || {},
+    };
+    saveDb();
+    editingAfterComplete = false;
+    reportWeekKey = null;
+    hideComplete();
+    elLoginGate.hidden = true;
+    elApp.hidden = false;
+    updateBrandUi();
+    ensureLockedSnapshots(now());
+    const target = resolveDefaultForm(now());
+    formMode = target.mode;
+    formNightId = target.nightKey;
+    render();
+    return Object.keys(db.nights).length;
+  }
+
+  async function importDataFile(file, { fromLogin = false } = {}) {
+    if (!file) return;
     if (file.size > 10 * 1024 * 1024) {
       toast("备份文件过大，无法导入");
       return;
@@ -532,24 +557,44 @@
       const parsed = JSON.parse(await file.text());
       const imported = normalizeImportedBackup(parsed);
       const nightCount = Object.keys(imported.data.nights).length;
-      const source = imported.sourceUser
+
+      let targetUser = currentUser;
+      if (fromLogin) {
+        if (!imported.sourceUser) {
+          toast("此备份没有用户名，请先填写「我是...」再进入后导入");
+          return;
+        }
+        targetUser = imported.sourceUser;
+      } else if (!targetUser) {
+        toast("请先登录再导入");
+        return;
+      }
+
+      const sourceNote = imported.sourceUser
         ? `（来自 ${imported.sourceUser}）`
         : "";
       const ok = confirm(
-        `将导入 ${nightCount} 条睡眠夜记录${source}，并覆盖 ${currentUser} 当前的本机数据。继续吗？`
+        fromLogin
+          ? `将导入 ${nightCount} 条睡眠夜记录${sourceNote}，并以「${targetUser}」进入。若本机已有同名记录会被覆盖。继续吗？`
+          : `将导入 ${nightCount} 条睡眠夜记录${sourceNote}，并覆盖 ${targetUser} 当前的本机数据。继续吗？`
       );
       if (!ok) return;
 
-      db = imported.data;
-      saveDb();
-      editingAfterComplete = false;
-      reportWeekKey = null;
-      hideComplete();
-      const target = resolveDefaultForm(now());
-      formMode = target.mode;
-      formNightId = target.nightKey;
-      render();
-      toast(`已导入 ${nightCount} 条睡眠夜记录`);
+      if (fromLogin || targetUser !== currentUser) {
+        const count = applyImportedData(targetUser, imported.data);
+        toast(`已导入 ${count} 条睡眠夜记录，欢迎回来 ${targetUser}`);
+      } else {
+        db = imported.data;
+        saveDb();
+        editingAfterComplete = false;
+        reportWeekKey = null;
+        hideComplete();
+        const target = resolveDefaultForm(now());
+        formMode = target.mode;
+        formNightId = target.nightKey;
+        render();
+        toast(`已导入 ${nightCount} 条睡眠夜记录`);
+      }
     } catch {
       toast("导入失败：请选择睡眠追踪导出的 JSON 文件");
     } finally {
@@ -1581,16 +1626,24 @@
     if (confirm("切换用户？当前页面会回到登录，各用户记录分开保存。")) logoutUser();
   });
 
+  let importFromLogin = false;
+
   document.getElementById("btn-export-data")?.addEventListener("click", () => {
     exportData();
   });
 
   document.getElementById("btn-import-data")?.addEventListener("click", () => {
+    importFromLogin = false;
+    elImportFile?.click();
+  });
+
+  document.getElementById("btn-login-import")?.addEventListener("click", () => {
+    importFromLogin = true;
     elImportFile?.click();
   });
 
   elImportFile?.addEventListener("change", () => {
-    importDataFile(elImportFile.files?.[0]);
+    importDataFile(elImportFile.files?.[0], { fromLogin: importFromLogin });
   });
 
   document.getElementById("btn-complete-edit")?.addEventListener("click", () => {

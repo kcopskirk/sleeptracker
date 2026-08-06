@@ -21,12 +21,20 @@
     <div class="login-card panel">
       <h1 class="panel-title">欢迎使用睡眠追踪</h1>
       <p class="panel-sub">输入你的名字，记录会保存在本机</p>
-      <label class="label" for="login-username">用户名</label>
+      <label class="label" for="login-username">我是...</label>
       <input id="login-username" type="text" maxlength="16" autocomplete="nickname" placeholder="例如：小明" />
       <p id="login-error" class="login-error" hidden></p>
-      <button type="button" class="btn btn-primary" id="btn-login">进入</button>
+      <button type="button" class="btn btn-primary" id="btn-login">开始</button>
+      <div class="login-divider" aria-hidden="true">
+        <span class="login-divider-line"></span>
+        <span class="login-divider-text">或</span>
+        <span class="login-divider-line"></span>
+      </div>
+      <button type="button" class="btn btn-ghost login-import-btn" id="btn-login-import">导入已有记录</button>
     </div>
   </div>
+
+  <input id="import-file" type="file" accept="application/json,.json" hidden />
 
   <div id="app">
     <header class="topbar">
@@ -39,7 +47,6 @@
         <button type="button" class="btn-user-action" id="btn-import-data">导入</button>
         <button type="button" class="btn-user-action" id="btn-switch-user">切换用户</button>
       </div>
-      <input id="import-file" type="file" accept="application/json,.json" hidden />
       <nav class="tabs" role="tablist">
         <button type="button" class="tab is-active" data-view="log" id="tab-log">记录</button>
         <button type="button" class="tab" data-view="report" id="tab-report">周报</button>

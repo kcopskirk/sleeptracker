@@ -160,6 +160,33 @@ body[data-theme="day"] {
   display: none !important;
 }
 
+.login-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 22px 0 16px;
+}
+
+.login-divider-line {
+  flex: 1;
+  height: 1px;
+  background: var(--line);
+}
+
+.login-divider-text {
+  color: var(--muted);
+  font-size: 0.85rem;
+  flex: 0 0 auto;
+}
+
+.login-import-btn {
+  width: 100%;
+  margin: 0;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--text);
+}
+
 #app[hidden] {
   display: none !important;
 }
